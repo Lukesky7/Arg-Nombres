@@ -1,4 +1,15 @@
 # Arg-nombres
+
+Paquetes utilizados:
+
+- plyr
+- tidyverse
+- ggthemes
+- readr
+- gmodels
+- forcats
+
+
 Registro de nombres de personas
 
 Ejercicio que trabaja con el registro de nombre de personas físicas que 
