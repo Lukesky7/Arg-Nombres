@@ -7,6 +7,7 @@ output:
 
 ```{r}
 library(plyr)
+library(dplyr)
 library(tidyverse)
 library(ggthemes)
 library(readr)
@@ -15,287 +16,137 @@ library(forcats)
 ```
 
 
+```{r Descarga, carga y renombrar variables}
+download.file("https://infra.datos.gob.ar/catalog/otros/dataset/2/distribution/2.1/download/historico-nombres.zip", "direccioncarpeta/Nombres.zip")
 
-```{r Abrir archivos}
-####rbind.fill de plyr, what about merge function?
-N2024 <- read_csv("N2024.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N2529 <- read_csv("N2529.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N3034 <- read_csv("N3034.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N3539 <- read_csv("N3539.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N4044 <- read_csv("N4044.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N4549 <- read_csv("N4549.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N5054 <- read_csv("N5054.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N5559 <- read_csv("N5559.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N6064 <- read_csv("N6064.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N6569 <- read_csv("N6569.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N7074 <- read_csv("N7074.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N7579 <- read_csv("N7579.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N8084 <- read_csv("N8084.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N8589 <- read_csv("N8589.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N9094 <- read_csv("N9094.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N9599 <- read_csv("N9599.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N0004 <- read_csv("N0004.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N0509 <- read_csv("N0509.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N1014 <- read_csv("N1014.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-N15 <- read_csv("N15.csv", col_types = cols(cantidad = col_number(),
-                                                anio = col_number()))
-```
- 
-```{r Combinar filas}
-N2015 <- rbind.fill(N2024,N2529,N3034,N3539,N4044, N4549,
-                    N5054, N5559, N6064,N6569,N7074,N7579,
-                    N8084,N8589,N9094,N9599,
-                    N0004,N0509,N1014,N15)
+unzip ("/direccionquequeremosguardar/Nombrearchivo.zip", overwrite = TRUE) 
+
+
+N2015 <- read.csv("historico-nombres.csv", sep = ",")
+
+N2015 <- rename(N2015,
+                Nombre = nombre, Cantidad = cantidad, Año = anio)
 ```
 
 
-```{r Ranking de 1920 a 2015, top and end 300}
-N2015rank <- N2015[rev(order(N2015$cantidad)),]
-NRPop <- head(N2015rank,10000)
+
+```{r Crear variable generación}
+N2015 <- N2015 %>%
+mutate(Generacion = case_when(Año <= 1945 ~ 'G Silenciosa',
+                              Año >= 1946 & Año <= 1964 ~ 'G BBoomers',
+                              Año >= 1965 & Año <= 1979 ~ 'G X',
+                              Año >= 1980 & Año <= 1999 ~ 'G Millenials',
+                              Año >= 2000  ~ 'G Centenials'))
+
+N2015$Generacion <- factor(N2015$Generacion,
+                           levels = c("G Silenciosa", "G BBoomers",
+                                      "G X", "G Millenials", "G Centenials"))
 ```
+
+
+```{r Organizar por generacion y nombre, filtro y generamos ranking}
+N2015Rnk <- N2015 %>% group_by(Generacion,Nombre) %>%
+  summarise( Tot = sum(Cantidad))
+
+N2015Rnk <- N2015Rnk %>% filter(Tot >= 10000)
+N2015Rnk <- N2015Rnk[rev(order(N2015Rnk$Tot)),]
+```
+
+
+```{r}
+options(digits = 3, scipen = 999)
+```
+
 
 
 ```{r Top 10 Generación silenciosa}
-GStop <- NRPop %>% filter(anio <= 1945)
-P <- GStop %>% group_by(nombre) %>%
-        summarise(Total = sum(cantidad))
+GStop <- N2015Rnk %>%
+  filter(Generacion %in% c("G Silenciosa"))
+  
+PG10 <- head(GStop,10)
+PG10$Nombre <- fct_reorder(PG10$Nombre,PG10$Tot)
 
-Prank <- P[rev(order(P$Total)),]
-PG10 <- head(Prank,10)
-print(PG10)
+PG10 %>% ggplot(aes(Nombre, Tot, fill = Nombre))+
+  geom_col()+
+  labs(title =  "Top 10 nombres registrados",
+       subtitle = "Generación silenciosa 1920-1944",
+       caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
+        theme_economist()+
+        coord_flip()
 ```
 
 
-```{r Armamos para gráfica}
-JC <- c(rep("Juan Carlos", 40726))
-AM <- c(rep("Ana María", 23286))
-CA <- c(rep("Carlos Alberto", 18846))
-M <- c(rep("María", 17019))
-MA <- c(rep("Miguel Ángel", 13983))
-J <- c(rep("Jose",14077))
-R <- c(rep("Rosa", 14013))
-A <- c(rep("Antonio",12583))
-ME <- c(rep("Maria Esther",11909))
-MT <- c(rep("Maria Teresa",11603))
 
-Nombre <- c(JC,AM,CA,M,MA,J,R,A,ME,MT)
-GStop10 <- data.frame(Nombre)
-```
 
 ```{r Top 10 Generación Baby Boomers}
-GBBtop <- NRPop %>% filter(anio >=1946 & anio <= 1964)
-PBB <- GBBtop %>% group_by(nombre) %>%
-        summarise(Total = sum(cantidad))
+GBBtop <- N2015Rnk %>%
+  filter(Generacion %in% c("G BBoomers"))
+  
+GBB10 <- head(GBBtop,10)
+GBB10$Nombre <- fct_reorder(GBB10$Nombre,GBB10$Tot)
 
-PBBrank <- PBB[rev(order(PBB$Total)),]
-PBB10 <- head(PBBrank,10)
-print(PBB10)
+GBB10 %>% ggplot(aes(Nombre, Tot, fill = Nombre))+
+  geom_col()+
+  labs(title =  "Top 10 nombres registrados",
+       subtitle = "Generación Baby Boomers 1946-1964",
+       caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
+        theme_economist()+
+        coord_flip()
 ```
 
-
-```{r Armado para gráfica}
-
-JC <- c(rep("Juan Carlos", 126466))
-MA <- c(rep("Miguel Ángel", 101648))
-AM <- c(rep("Ana María", 86806))
-CA <- c(rep("Carlos Alberto", 82120))
-MC <- c(rep("María Cristina", 79877))
-JL <- c(rep("Jose Luis",51120))
-SM <- c(rep("Stella Maris",47405))
-MDC <- c(rep("Maria del Carmen",46207))
-LA <- c(rep("Luis Alberto",44971))
-NB <- c(rep("Norma Beatriz",30336))
-
-Nombre <- c(JC,MA,AM,CA,MC, JL,SM,MDC,LA,NB)
-Nombre <- as.factor(Nombre)
-GBBtop10 <- data.frame(Nombre)
-
-```
 
 
 ```{r Top 10 Generación X}
-GXtop <- NRPop %>% filter(anio >=1965 & anio <= 1979)
-GX <- GXtop %>% group_by(nombre) %>%
-        summarise(Total = sum(cantidad))
+GXtop <- N2015Rnk %>%
+  filter(Generacion %in% c("G X"))
+  
+GXtop10 <- head(GXtop,10)
+GXtop10$Nombre <- fct_reorder(GXtop10$Nombre,GXtop10$Tot)
 
-GXrank <- GX[rev(order(GX$Total)),]
-GX10 <- head(GXrank,10)
-print(GX10)
+GXtop10 %>% ggplot(aes(Nombre, Tot, fill = Nombre))+
+  geom_col()+
+  labs(title =  "Top 10 nombres registrados",
+       subtitle = "Generación X 1965-1979",
+       caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
+        theme_economist()+
+        coord_flip()
 ```
 
 
-```{r Armado para gráfica}
-
-MA <- c(rep("Miguel Ángel", 68519))
-JC <- c(rep("Juan Carlos", 68365))
-JL <- c(rep("Jose Luis", 55669))
-CA <- c(rep("Carlos Alberto", 53119))
-MAL <- c(rep("María Alejandra", 40491))
-LA <- c(rep("Luis Alberto",33620))
-NB <- c(rep("Norma Beatriz", 28547))
-ML <- c(rep("Maria Laura",26989))
-JCe <- c(rep("Julio Cesar",26670))
-AM <- c(rep("Ana Maria",24458))
-
-Nombre <- c(MA, JC, JL, CA, MAL,LA,NB,ML,JCe,AM)
-Nombre <- as.factor(Nombre)
-GXtop10 <- data.frame(Nombre)
-```
 
 ```{r Top 10 Generación Millenials}
-GMtop <- NRPop %>% filter(anio >=1980 & anio <= 1999)
-GM <- GMtop %>% group_by(nombre) %>%
-        summarise(Total = sum(cantidad))
+GMtop <- N2015Rnk %>%
+  filter(Generacion %in% c("G Millenials"))
+  
+GM10 <- head(GMtop,10)
+GM10$Nombre <- fct_reorder(GM10$Nombre,GM10$Tot)
 
-GMrank <- GM[rev(order(GM$Total)),]
-GM10 <- head(GMrank,10)
-print(GM10)
-```
-
-
-```{r Armamos para gráfica}
-
-JM <- c(rep("Juan Manuel", 65858))
-MB <- c(rep("María Belen", 64174))
-MF <- c(rep("María Florencia", 60336))
-MA <- c(rep("Miguel Ángel", 58633))
-JP <- c(rep("Juan Pablo", 54401))
-JL <- c(rep("Jose Luis",52297))
-ML <- c(rep("Maria Laura",48217))
-JC <- c(rep("Juan Carlos",47560))
-ME <- c(rep("Maria Eugenia",40552))
-JI <- c(rep("Juan Ignacio",38148))
-
-Nombre <- c(JM, MB, MF, MA, JP, JL,ML,JC,ME,JI)
-Nombre <- as.factor(Nombre)
-GMtop10 <- data.frame(Nombre)
-```
-
-
-```{r Top 10 Generación Centenials}
-GCtop <- NRPop %>% filter(anio >= 2000)
-GC <- GCtop %>% group_by(nombre) %>%
-        summarise(Total = sum(cantidad))
-
-GCrank <- GC[rev(order(GC$Total)),]
-GC10 <- head(GCrank,10)
-print(GC10)
-```
-
-
-```{r Armado para gráfica}
-V <- c(rep("Valentina", 41799))
-M <- c(rep("Martina", 41110))
-S <- c(rep("Santiago", 36743))
-JI <- c(rep("Juan Ignacio", 34215))
-J <- c(rep("Joaquin", 33165))
-So <- c(rep("Sofia",30211))
-B <- c(rep("Benjamin",30145))
-C <- c(rep("Catalina",29814))
-Bau <- c(rep("Bautista",28290))
-Fr <- c(rep("Francisco",24285))
-
-Nombre <- c(V, M, S, JI, J, So, B, C, Bau, Fr)
-Nombre <- as.factor(Nombre)
-GCtop10 <- data.frame(Nombre)
-```
-
-
-```{r Antes de graficar para que no salga formula en eje Y}
-options(scipen = 10000)
-```
-
-
-```{r Gráfica Generacion silenciosa 1920-1944}
-GStop10 %>% mutate(Nombre = fct_relevel(
-                Nombre,"Juan Carlos", "Ana María", "Carlos Alberto",
-                "María", "Miguel Ángel", "Jose", "Rosa",
-                "Antonio","Maria Esther","Maria Teresa")) %>%
-ggplot(aes(Nombre, fill=Nombre))+
-        geom_bar()+
-        labs(title =  "Top 10 nombres registrados",
-      subtitle = "Generación silenciosa 1920-1944",
-    caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
+GM10 %>% ggplot(aes(Nombre, Tot, fill = Nombre))+
+  geom_col()+
+  labs(title =  "Top 10 nombres registrados",
+       subtitle = "Generación Millenials 1980-1999",
+       caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
         theme_economist()+
         coord_flip()
 ```
 
-```{r Gráfica Baby Boomers top 10 falta detalles}
-GBBtop10 %>% mutate(Nombre = fct_relevel(
-        Nombre,"Juan Carlos", "Miguel Ángel", "Ana María",
-        "Carlos Alberto", "María Cristina", "Jose Luis","Stella Maris",
-        "Maria del Carmen","Luis Alberto","Norma Beatriz")) %>%
-        ggplot( aes(x=Nombre, fill=Nombre))+
-        geom_bar()+
-        labs(title =  "Top 10 nombres registrados",
-             subtitle = "Generación Baby Boomers 1945-1964",
-             caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
-        theme_economist()+
-        coord_flip()
-
-```
 
 
-```{r Gráfica popularidad generación X}
-GXtop10 %>% mutate(Nombre = fct_relevel(
-        Nombre, "Miguel Ángel", "Juan Carlos",
-        "Jose Luis", "Carlos Alberto", "María Alejandra", "Luis Alberto",
-        "Norma Beatriz", "Maria Laura", "Julio Cesar","Ana Maria")) %>%
-        ggplot( aes(x=Nombre, fill=Nombre))+
-        geom_bar()+
-        labs(title =  "Top 10 nombres registrados",
-             subtitle = "Generación X 1965-1979",
-             caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
-        theme_economist()+
-        coord_flip()
+```{r}
+GCtop <- N2015Rnk %>%
+  filter(Generacion %in% c("G Centenials"))
+  
+GC10 <- head(GCtop,10)
+GC10$Nombre <- fct_reorder(GC10$Nombre,GC10$Tot)
 
-```
-
-
-```{r Gráfica popularidad generación Millenials}
-GMtop10 %>% mutate(Nombre = fct_relevel(
-        Nombre, "Juan Manuel", "María Belen",
-        "María Florencia", "Miguel Ángel", "Juan Pablo", "Jose Luis",
-        "Maria Laura","Juan Carlos", "Maria Eugenia","Juan Ignacio")) %>%
-        ggplot( aes(x=Nombre, fill=Nombre))+
-        geom_bar()+
-        labs(title =  "Top 10 nombres registrados",
-             subtitle = "Generación Millenials 1980-1999",
-             caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
+GC10 %>% ggplot(aes(Nombre, Tot, fill = Nombre))+
+  geom_col()+
+  labs(title =  "Top 10 nombres registrados",
+       subtitle = "Generación Centenials 2000-2015",
+       caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
         theme_economist()+
         coord_flip()
 ```
 
-```{r Gráfica populatidad generación Centenials}
-GCtop10 %>% mutate(Nombre = fct_relevel(
-        Nombre, "Valentina", "Martina",
-        "Santiago", "Juan Ignacio", "Joaquín", "Sofia", "Benjamin",
-        "Catalina","Bautista", "Catalina","Bautista", "Francisco")) %>%
-        ggplot( aes(x=Nombre, fill=Nombre))+
-        geom_bar()+
-        labs(title =  "Top 10 nombres registrados",
-             subtitle = "Generación Centenialls 2000-2015",
-             caption = "Fuente: Elaboración propia con datos del Ministerio del interior, obras públicas y vivienda pública")+
-        theme_economist()+
-        coord_flip()
-```
+
 
